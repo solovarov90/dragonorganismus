@@ -8,6 +8,7 @@ export interface ILeadMagnet extends Document {
     triggerId: string;
     isActive: boolean;
     welcomeMessage?: string;
+    buttonText?: string;
     followUpMessages?: string[];
 }
 
@@ -17,6 +18,7 @@ const LeadMagnetSchema: Schema = new Schema({
     type: { type: String, enum: ['link', 'text', 'file'], default: 'link' },
     content: { type: String, required: true }, // URL for link, text body, or file_id
     link: { type: String }, // Backward compatibility
+    buttonText: { type: String },
     triggerId: { type: String, required: true, unique: true },
     isActive: { type: Boolean, default: true },
     welcomeMessage: { type: String },

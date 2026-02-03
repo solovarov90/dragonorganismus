@@ -12,11 +12,14 @@ const LeadMagnets = () => {
     const [description, setDescription] = useState('');
     const [type, setType] = useState<'link' | 'text' | 'file'>('link');
     const [content, setContent] = useState('');
+    const [buttonText, setButtonText] = useState('Открыть 🚀');
     const [welcomeMessage, setWelcomeMessage] = useState('');
     const [triggerId, setTriggerId] = useState('');
     const [isAutoSlug, setIsAutoSlug] = useState(true);
 
     const [creating, setCreating] = useState(false);
+
+    const SUGGESTED_BUTTONS = ['Скачать 🎁', 'Открыть 🚀', 'Получить 💎', 'Смотреть 🔥', 'Перейти 👉'];
 
     const fetchMagnets = async () => {
         try {
@@ -63,6 +66,7 @@ const LeadMagnets = () => {
                 description,
                 type,
                 content,
+                buttonText: type === 'link' ? buttonText : undefined,
                 triggerId,
                 welcomeMessage,
                 isActive: true
@@ -189,6 +193,32 @@ const LeadMagnets = () => {
                             />
                         </div>
                     </div>
+
+                    {type === 'link' && (
+                        <div className="space-y-2 animate-in slide-in-from-top duration-300">
+                            <label className="text-sm font-medium text-text-muted">Текст кнопки со ссылкой</label>
+                            <div className="flex gap-2">
+                                <input
+                                    className="input-field flex-1"
+                                    placeholder="Скачать 🚀"
+                                    value={buttonText}
+                                    onChange={(e) => setButtonText(e.target.value)}
+                                />
+                                <div className="flex gap-1">
+                                    {SUGGESTED_BUTTONS.map(btn => (
+                                        <button
+                                            key={btn}
+                                            type="button"
+                                            onClick={() => setButtonText(btn)}
+                                            className="px-2 py-1 bg-surface border border-border rounded text-xs hover:border-primary transition-colors"
+                                        >
+                                            {btn.split(' ')[1]}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-text-muted">Приветственное сообщение (опционально)</label>

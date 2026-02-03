@@ -104,16 +104,22 @@ bot.command("start", async (ctx) => {
 
             const welcomeMsg = magnet.welcomeMessage || `Вот ваш контент: ${magnet.name}\n\n${magnet.description}`;
 
-            await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
-
             // Deliver based on type
             if (magnet.type === 'link' || (!magnet.type && magnet.link)) {
-                // Backward compatibility or explicit link
-                const link = magnet.content || magnet.link; // use content if available, fallback to old link field
-                await ctx.reply(`[Скачать/Открыть](${link})`, { parse_mode: "Markdown" });
+                const link = magnet.content || magnet.link;
+                const btnText = magnet.buttonText || "Открыть 🚀";
+
+                await ctx.reply(welcomeMsg, {
+                    parse_mode: "Markdown",
+                    reply_markup: {
+                        inline_keyboard: [[{ text: btnText, url: link }]]
+                    }
+                });
             } else if (magnet.type === 'text') {
+                await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
                 await ctx.reply(magnet.content);
             } else if (magnet.type === 'file') {
+                await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
                 // Content should be a file_id or url
                 try {
                     await ctx.replyWithDocument(magnet.content, { caption: magnet.name });
