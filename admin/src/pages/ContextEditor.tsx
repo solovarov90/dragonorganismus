@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, Plus, Trash, Edit, X, Brain, Check, XCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { api } from '../api';
 import type { KnowledgeEntry, KnowledgeCategory } from '../types';
 import { CATEGORY_CONFIG } from '../types';
@@ -7,6 +8,7 @@ import { CATEGORY_CONFIG } from '../types';
 interface ChatMessage {
     role: 'user' | 'agent';
     text: string;
+    isTyping?: boolean;
 }
 
 interface PendingFact {
@@ -15,15 +17,41 @@ interface PendingFact {
     content: string;
 }
 
+// Typing effect component
+const TypewriterText = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
+    const [displayText, setDisplayText] = useState('');
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+        if (currentIndex < text.length) {
+            const timer = setTimeout(() => {
+                setDisplayText(prev => prev + text[currentIndex]);
+                setCurrentIndex(prev => prev + 1);
+            }, 15); // Speed of typing
+            return () => clearTimeout(timer);
+        } else if (onComplete) {
+            onComplete();
+        }
+    }, [currentIndex, text, onComplete]);
+
+    return (
+        <div className="prose prose-invert prose-sm max-w-none prose-strong:text-accent prose-strong:font-bold prose-headings:text-accent prose-li:my-0.5 prose-ul:my-1 prose-ol:my-1 prose-p:my-1">
+            <ReactMarkdown>{displayText}</ReactMarkdown>
+        </div>
+    );
+};
+
 const ContextEditor = () => {
     // Chat State
     const [messages, setMessages] = useState<ChatMessage[]>([
-        { role: 'agent', text: 'Привет! Я твой продюсер. Расскажи мне о себе — кто ты, чем занимаешься, какие у тебя продукты и услуги. Я помогу сформировать твой цифровой портрет.' }
+        { role: 'agent', text: '👋 **Привет!** Я твой продюсер.\n\nРасскажи мне о себе — кто ты, чем занимаешься, какие у тебя продукты и услуги.\n\n_Я помогу сформировать твой цифровой портрет._' }
     ]);
     const [inputText, setInputText] = useState('');
     const [sending, setSending] = useState(false);
     const [pendingFacts, setPendingFacts] = useState<PendingFact[]>([]);
-    const chatEndRef = useRef<HTMLDivElement>(null);
+    const [isTypingComplete, setIsTypingComplete] = useState(true);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Knowledge Base State
     const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
@@ -44,9 +72,19 @@ const ContextEditor = () => {
         fetchEntries();
     }, []);
 
+    // Smart scroll - only scroll within chat container
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
     }, [messages]);
+
+    // Keep focus on input
+    useEffect(() => {
+        if (!sending && isTypingComplete) {
+            inputRef.current?.focus();
+        }
+    }, [sending, isTypingComplete]);
 
     const fetchEntries = async () => {
         try {
@@ -66,6 +104,7 @@ const ContextEditor = () => {
         setInputText('');
         setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
         setSending(true);
+        setIsTypingComplete(false);
 
         try {
             const res = await api.post('/agent-chat', {
@@ -75,17 +114,25 @@ const ContextEditor = () => {
 
             const { reply, facts } = res.data;
 
-            setMessages(prev => [...prev, { role: 'agent', text: reply }]);
+            setMessages(prev => [...prev, { role: 'agent', text: reply, isTyping: true }]);
 
             if (facts && facts.length > 0) {
                 setPendingFacts(prev => [...prev, ...facts]);
             }
         } catch (err) {
             console.error(err);
-            setMessages(prev => [...prev, { role: 'agent', text: 'Произошла ошибка. Попробуй еще раз.' }]);
+            setMessages(prev => [...prev, { role: 'agent', text: '❌ Произошла ошибка. Попробуй еще раз.' }]);
+            setIsTypingComplete(true);
         } finally {
             setSending(false);
         }
+    };
+
+    const handleTypingComplete = (index: number) => {
+        setMessages(prev => prev.map((msg, i) =>
+            i === index ? { ...msg, isTyping: false } : msg
+        ));
+        setIsTypingComplete(true);
     };
 
     const handleApproveFact = async (fact: PendingFact, index: number) => {
@@ -171,25 +218,41 @@ const ContextEditor = () => {
                 </div>
 
                 {/* Chat Messages */}
-                <div className="bg-surface/50 rounded-xl p-4 h-[300px] overflow-y-auto mb-4 space-y-3">
+                <div
+                    ref={chatContainerRef}
+                    className="bg-surface/50 rounded-xl p-4 h-[400px] overflow-y-auto mb-4 space-y-4 scroll-smooth"
+                >
                     {messages.map((msg, i) => (
                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] px-4 py-2 rounded-2xl ${msg.role === 'user'
-                                    ? 'bg-primary/20 text-text rounded-br-sm'
-                                    : 'bg-surface text-text rounded-bl-sm'
+                            <div className={`max-w-[85%] px-4 py-3 rounded-2xl shadow-lg ${msg.role === 'user'
+                                ? 'bg-primary/30 text-text rounded-br-sm border border-primary/20'
+                                : 'bg-surface/90 text-text rounded-bl-sm border border-accent/10'
                                 }`}>
-                                {msg.text}
+                                {msg.role === 'agent' && msg.isTyping ? (
+                                    <TypewriterText
+                                        text={msg.text}
+                                        onComplete={() => handleTypingComplete(i)}
+                                    />
+                                ) : (
+                                    <div className="prose prose-invert prose-sm max-w-none prose-strong:text-accent prose-strong:font-bold prose-headings:text-accent prose-li:my-0.5 prose-ul:my-1 prose-ol:my-1 prose-p:my-1">
+                                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
                     {sending && (
                         <div className="flex justify-start">
-                            <div className="bg-surface text-text-muted px-4 py-2 rounded-2xl rounded-bl-sm animate-pulse">
-                                Думаю...
+                            <div className="bg-surface/90 text-accent px-4 py-3 rounded-2xl rounded-bl-sm border border-accent/20 flex items-center gap-2">
+                                <div className="flex gap-1">
+                                    <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                    <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                    <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                </div>
+                                <span className="text-sm text-text-muted">Думаю...</span>
                             </div>
                         </div>
                     )}
-                    <div ref={chatEndRef} />
                 </div>
 
                 {/* Pending Facts */}
