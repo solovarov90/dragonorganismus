@@ -5,7 +5,7 @@
   "main": "functions/bot.ts",
   "scripts": {
     "dev": "netlify dev",
-    "build": "echo \"Build script placeholder\""
+    "build": "cd admin && npm install && npm run build"
   },
   "keywords": [],
   "author": "",
