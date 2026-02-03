@@ -2,7 +2,8 @@ export interface LeadMagnet {
     _id: string;
     name: string;
     description: string;
-    link: string;
+    type: 'link' | 'text' | 'file';
+    content: string;
     triggerId: string;
     isActive: boolean;
     welcomeMessage?: string;

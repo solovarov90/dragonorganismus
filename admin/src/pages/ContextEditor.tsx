@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Save, Bot } from 'lucide-react';
 import { api } from '../api';
 
 const ContextEditor = () => {
@@ -12,35 +13,47 @@ const ContextEditor = () => {
     const handleSave = async () => {
         setLoading(true);
         try {
-            await api.post('/context', { value: context });
-            alert("Saved!");
+            await api.post('/context', { key: 'main_system_prompt', value: context });
+            alert("Сохранено!");
         } catch (err) {
             console.error(err);
-            alert("Error saving");
+            alert("Ошибка сохранения");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="space-y-4">
-            <h2 className="text-xl font-bold">Author & Product Context</h2>
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">System Instruction</label>
-                <textarea
-                    className="w-full h-64 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={context}
-                    onChange={(e) => setContext(e.target.value)}
-                    placeholder="Describe how the bot should behave..."
-                />
+        <div className="space-y-6 pb-20">
+            <div className="glass-panel p-6 shadow-neon/10">
+                <div className="flex items-center gap-3 mb-6 text-accent">
+                    <Bot size={28} />
+                    <div>
+                        <h2 className="text-xl font-bold font-mono">Контекст ИИ</h2>
+                        <p className="text-xs text-text-muted">Здесь задается личность и знания бота</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <textarea
+                        className="input-field min-h-[400px] font-mono text-sm leading-relaxed"
+                        value={context}
+                        onChange={(e) => setContext(e.target.value)}
+                        placeholder="Ты — экспертный помощник..."
+                    />
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={handleSave}
+                            disabled={loading}
+                            className="btn-primary flex items-center gap-2"
+                        >
+                            <Save size={18} />
+                            {loading ? 'Сохранение...' : 'Сохранить изменения'}
+                        </button>
+                    </div>
+                </div>
             </div>
-            <button
-                onClick={handleSave}
-                disabled={loading}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium shadow-md active:bg-blue-700 disabled:opacity-50"
-            >
-                {loading ? "Saving..." : "Save Changes"}
-            </button>
         </div>
     );
 };

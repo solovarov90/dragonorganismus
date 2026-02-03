@@ -3,17 +3,19 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface ILeadMagnet extends Document {
     name: string;
     description: string;
-    link: string;
-    triggerId: string; // The ID used in deep linking like /start <triggerId>
+    type: 'link' | 'text' | 'file';
+    content: string;
+    triggerId: string;
     isActive: boolean;
     welcomeMessage?: string;
-    followUpMessages?: string[]; // Array of messages to send after delivery
+    followUpMessages?: string[];
 }
 
 const LeadMagnetSchema: Schema = new Schema({
     name: { type: String, required: true },
     description: { type: String, required: true },
-    link: { type: String, required: true },
+    type: { type: String, enum: ['link', 'text', 'file'], default: 'link' },
+    content: { type: String, required: true }, // URL for link, text body, or file_id
     triggerId: { type: String, required: true, unique: true },
     isActive: { type: Boolean, default: true },
     welcomeMessage: { type: String },

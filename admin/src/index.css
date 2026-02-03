@@ -1,9 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  color-scheme: dark;
 }
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply bg-background text-text font-sans antialiased;
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+  min-height: 100vh;
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-surface/50 backdrop-blur-xl border border-border/50 shadow-glass rounded-xl;
+  }
+
+  .input-field {
+    @apply w-full bg-surface border border-border rounded-lg px-4 py-2 text-text focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-black font-semibold px-4 py-2 rounded-lg hover:bg-primary-glow hover:shadow-neon transition-all active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-surface border border-border text-text px-4 py-2 rounded-lg hover:bg-border/80 transition-all active:scale-95;
+  }
 }

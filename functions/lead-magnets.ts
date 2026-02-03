@@ -24,6 +24,12 @@ export const handler: Handler = async (event, context) => {
 
         if (event.httpMethod === 'POST') {
             const data = JSON.parse(event.body || '{}');
+
+            // Basic validation
+            if (!data.name || !data.triggerId || !data.content) {
+                return { statusCode: 400, headers, body: JSON.stringify({ error: "Missing required fields (name, triggerId, content)" }) };
+            }
+
             const newMagnet = await LeadMagnet.create(data);
             return { statusCode: 201, headers, body: JSON.stringify(newMagnet) };
         }

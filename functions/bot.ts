@@ -71,8 +71,25 @@ bot.command("start", async (ctx) => {
 
             const welcomeMsg = magnet.welcomeMessage || `Вот ваш контент: ${magnet.name}\n\n${magnet.description}`;
 
-            await ctx.reply(`${welcomeMsg}\n\n[Скачать/Открыть](${magnet.link})`, { parse_mode: "Markdown" });
-            await logMessage(userId!, 'assistant', `Sent Lead Magnet: ${magnet.name}`);
+            await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
+
+            // Deliver based on type
+            if (magnet.type === 'link' || (!magnet.type && magnet.link)) {
+                // Backward compatibility or explicit link
+                const link = magnet.content || magnet.link; // use content if available, fallback to old link field
+                await ctx.reply(`[Скачать/Открыть](${link})`, { parse_mode: "Markdown" });
+            } else if (magnet.type === 'text') {
+                await ctx.reply(magnet.content);
+            } else if (magnet.type === 'file') {
+                // Content should be a file_id or url
+                try {
+                    await ctx.replyWithDocument(magnet.content, { caption: magnet.name });
+                } catch (e) {
+                    await ctx.reply(`Не удалось отправить файл. Вот ссылка: ${magnet.content}`);
+                }
+            }
+
+            await logMessage(userId!, 'assistant', `Sent Lead Magnet: ${magnet.name} (${magnet.type})`);
 
             // Simple immediate follow-up simulation
             if (magnet.followUpMessages && magnet.followUpMessages.length > 0) {
@@ -116,7 +133,7 @@ bot.on("message:text", async (ctx) => {
         await logMessage(userId, 'assistant', text);
     } catch (error) {
         console.error("AI Error:", error);
-        await ctx.reply("I'm having trouble thinking right now. Please try again later.");
+        await ctx.reply("У меня возникли трудности с ответом. Попробуйте чуть позже.");
     }
 });
 
