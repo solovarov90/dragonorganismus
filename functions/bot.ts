@@ -130,8 +130,8 @@ export const handler = async (event: any, context: any) => {
             await bot.init();
         }
 
-        // Use 'netlify' adapter (should work with updated grammy)
-        const callback = webhookCallback(bot, "netlify");
+        // Use 'aws-lambda-async' adapter for Netlify async functions
+        const callback = webhookCallback(bot, "aws-lambda-async");
 
         return await callback(event, context);
     } catch (error) {
