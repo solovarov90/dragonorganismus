@@ -1,0 +1,11 @@
+[build]
+  functions = "functions"
+  publish = "admin/dist"
+
+[dev]
+  command = "cd admin && npm run dev"
+  targetPort = 5173 
+  autoLaunch = false
+
+[functions]
+  node_bundler = "esbuild"

@@ -1,0 +1,24 @@
+{
+  "name": "dragonorganismus",
+  "version": "1.0.0",
+  "description": "Telegram Bot with Admin Panel",
+  "main": "functions/bot.ts",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo \"Build script placeholder\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.1.3",
+    "dotenv": "^16.3.1",
+    "grammy": "^1.19.2",
+    "mongoose": "^8.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3",
+    "netlify-cli": "^17.10.1"
+  }
+}
