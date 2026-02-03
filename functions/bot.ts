@@ -154,7 +154,7 @@ bot.on("message:text", async (ctx) => {
 
         if (isLearningMode) {
             // LEARNING MODE: Extract facts using AI
-            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
             const extractPrompt = `Ты — продюсер экспертов. Твоя задача — извлекать ключевые факты из информации, которую дает эксперт.
 
@@ -256,7 +256,7 @@ bot.on("message:text", async (ctx) => {
         const history = await MessageLog.find({ userId }).sort({ timestamp: -1 }).limit(10);
         const historyText = history.reverse().map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
 
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const prompt = `${systemPrompt}${knowledgeContext}\n\n### История чата:\n${historyText}\n\nUser: ${userText}\nAssistant:`;
 
