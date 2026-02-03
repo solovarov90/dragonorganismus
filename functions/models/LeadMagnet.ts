@@ -16,6 +16,7 @@ const LeadMagnetSchema: Schema = new Schema({
     description: { type: String, required: true },
     type: { type: String, enum: ['link', 'text', 'file'], default: 'link' },
     content: { type: String, required: true }, // URL for link, text body, or file_id
+    link: { type: String }, // Backward compatibility
     triggerId: { type: String, required: true, unique: true },
     isActive: { type: Boolean, default: true },
     welcomeMessage: { type: String },

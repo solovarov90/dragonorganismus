@@ -64,9 +64,10 @@ const LeadMagnets = () => {
             setTriggerId('');
             setCreating(false);
             fetchMagnets();
-        } catch (err) {
-            alert('Ошибка при создании');
+        } catch (err: any) {
             console.error(err);
+            const msg = err.response?.data?.error || err.message || 'Ошибка при создании';
+            alert(`Ошибка: ${msg}`);
             setCreating(false);
         }
     };

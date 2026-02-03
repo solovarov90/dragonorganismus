@@ -46,18 +46,25 @@ bot.command("start", async (ctx) => {
 
     // Admin Menu Handling
     if (userId && ADMIN_IDS.includes(userId)) {
-        console.log(`Setting Admin Menu for user ${userId} with URL ${WEBAPP_URL}`);
+        console.log(`Setting Admin Menu for user ${userId}`);
         try {
             await ctx.setChatMenuButton({
                 type: "web_app",
                 text: "Admin Panel",
                 web_app: { url: WEBAPP_URL }
             });
+
+            // Fallback: Also send an inline button, as the Menu Button can be glitchy
+            await ctx.reply("👮‍♂️ Вы опознаны как администратор.", {
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: "🚀 Открыть Админку", web_app: { url: WEBAPP_URL } }
+                    ]]
+                }
+            });
         } catch (err) {
             console.error("Failed to set admin menu:", err);
         }
-    } else {
-        console.log(`User ${userId} is not an admin. Admins: ${ADMIN_IDS.join(', ')}`);
     }
 
     if (payload) {
