@@ -44,10 +44,12 @@ import { SystemLog } from "./models/SystemLog";
 
 const notifyAdmins = async (message: string) => {
     for (const adminId of ADMIN_IDS) {
+        if (!adminId) continue;
         try {
             await bot.api.sendMessage(adminId, message, { parse_mode: "Markdown" });
-        } catch (e) {
-            console.error(`Failed to notify admin ${adminId}:`, e);
+        } catch (e: any) {
+            console.error(`Failed to notify admin ${adminId}:`, e.message);
+            // Don't crash if one admin fails
         }
     }
 };
@@ -91,30 +93,52 @@ bot.command("start", async (ctx) => {
     if (payload) {
         const magnet = await LeadMagnet.findOne({ triggerId: payload });
         if (magnet && magnet.isActive) {
-            // Track consumption
-            await User.findOneAndUpdate(
-                { telegramId: userId },
-                { $addToSet: { consumedMagnets: magnet.triggerId } }
-            );
+            // Check if already consumed
+            const currentUser = await User.findOne({ telegramId: userId });
+            const isRevisit = currentUser?.consumedMagnets?.includes(payload);
 
-            // Notify Admins & Log
-            const notificationMsg = `🧲 **Новый лид!**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})\n📦 Магнит: ${magnet.name}\n🆔 Trigger: ${payload}`;
-            await notifyAdmins(notificationMsg);
-            await logEvent('lead_magnet_consumed', userId!, `Consumed magnet: ${magnet.name}`, { magnetId: magnet._id, triggerId: payload });
+            if (!isRevisit) {
+                // Track consumption
+                await User.findOneAndUpdate(
+                    { telegramId: userId },
+                    { $addToSet: { consumedMagnets: magnet.triggerId } }
+                );
+
+                // Notify Admins & Log
+                const notificationMsg = `🧲 **Новый лид!**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})\n📦 Магнит: ${magnet.name}\n🆔 Trigger: ${payload}`;
+                await notifyAdmins(notificationMsg);
+                await logEvent('lead_magnet_consumed', userId!, `Consumed magnet: ${magnet.name}`, { magnetId: magnet._id, triggerId: payload });
+            } else {
+                await logMessage(userId!, 'assistant', `Re-visited magnet: ${magnet.name}`);
+            }
 
             const welcomeMsg = magnet.welcomeMessage || `Вот ваш контент: ${magnet.name}\n\n${magnet.description}`;
 
             // Deliver based on type
             if (magnet.type === 'link' || (!magnet.type && magnet.link)) {
-                const link = magnet.content || magnet.link;
+                let link = magnet.content || magnet.link;
                 const btnText = magnet.buttonText || "Открыть 🚀";
 
-                await ctx.reply(welcomeMsg, {
-                    parse_mode: "Markdown",
-                    reply_markup: {
-                        inline_keyboard: [[{ text: btnText, url: link }]]
+                // Basic URL fix
+                if (link && !link.startsWith('http')) {
+                    if (link.startsWith('@') || link.startsWith('t.me/')) {
+                        link = `https://t.me/${link.replace(/^@/, '').replace('t.me/', '')}`;
+                    } else {
+                        link = `https://${link}`;
                     }
-                });
+                }
+
+                try {
+                    await ctx.reply(welcomeMsg, {
+                        parse_mode: "Markdown",
+                        reply_markup: {
+                            inline_keyboard: [[{ text: btnText, url: link }]]
+                        }
+                    });
+                } catch (e) {
+                    console.error(`Failed to send link magnet (url: ${link}):`, e);
+                    await ctx.reply(`${welcomeMsg}\n\nСсылка: ${link}`);
+                }
             } else if (magnet.type === 'text') {
                 await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
                 await ctx.reply(magnet.content);
@@ -147,7 +171,7 @@ bot.command("start", async (ctx) => {
     await logEvent('bot_start', userId!, 'User started bot');
 
     const menu = getMainMenu(ADMIN_IDS.includes(userId!));
-    await ctx.reply("Добро пожаловать! Я ваш персональный помощник. Чем могу помочь?", {
+    await ctx.reply("👋 Добро пожаловать! Выберите действие в меню:", {
         reply_markup: menu
     });
 });
