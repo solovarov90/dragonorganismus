@@ -323,7 +323,7 @@ const LeadMagnets = () => {
                     <div className="grid gap-4 md:grid-cols-2">
                         {magnets.map((m) => (
                             <div key={m._id} className="glass-panel p-4 hover:border-primary/50 transition-colors group relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                <div className="absolute top-0 right-0 p-2 flex gap-2">
                                     <button
                                         className="text-text-muted hover:text-primary"
                                         title="Копировать ссылку"
