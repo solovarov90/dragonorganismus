@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, Settings, Activity } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Activity, Megaphone } from 'lucide-react';
 
 const Layout = () => {
     const location = useLocation();
@@ -8,6 +8,7 @@ const Layout = () => {
         { path: '/', label: 'Дашборд', icon: LayoutDashboard },
         { path: '/lead-magnets', label: 'Магниты', icon: FileText },
         { path: '/context', label: 'Контекст', icon: Settings },
+        { path: '/broadcasts', label: 'Рассылки', icon: Megaphone },
         { path: '/logs', label: 'Логи', icon: Activity },
     ];
 
