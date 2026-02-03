@@ -81,7 +81,12 @@ const LeadMagnets = () => {
             fetchMagnets();
         } catch (err: any) {
             console.error(err);
-            const msg = err.response?.data?.error || err.message || 'Ошибка при создании';
+            let msg = err.response?.data?.error || err.message || 'Ошибка при создании';
+
+            if (msg.includes('E11000')) {
+                msg = 'Этот ID (Slug) уже занят. Выберите другое название или измените ID вручную.';
+            }
+
             alert(`Ошибка: ${msg}`);
             setCreating(false);
         }

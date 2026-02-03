@@ -30,6 +30,17 @@ export const handler: Handler = async (event, context) => {
                 return { statusCode: 400, headers, body: JSON.stringify({ error: "Missing required fields (name, triggerId, content)" }) };
             }
 
+            // Auto-increment if ID exists
+            let originalId = data.triggerId;
+            let finalId = originalId;
+            let counter = 1;
+
+            while (await LeadMagnet.findOne({ triggerId: finalId })) {
+                finalId = `${originalId}_${counter}`;
+                counter++;
+            }
+            data.triggerId = finalId;
+
             const newMagnet = await LeadMagnet.create(data);
             return { statusCode: 201, headers, body: JSON.stringify(newMagnet) };
         }
