@@ -123,14 +123,26 @@ bot.on("message:text", async (ctx) => {
         const systemPromptDoc = await Context.findOne({ key: 'main_system_prompt' });
         const systemPrompt = systemPromptDoc ? systemPromptDoc.value : "You are a helpful assistant.";
 
-        // Construct context with recent history (simplified)
-        // In prod, fetch last N messages from MessageLog for this user
+        // Fetch Knowledge Base entries
+        const { KnowledgeEntry } = await import('./models/KnowledgeEntry');
+        const knowledgeEntries = await KnowledgeEntry.find({}).lean();
+
+        // Format knowledge as context
+        let knowledgeContext = '';
+        if (knowledgeEntries.length > 0) {
+            knowledgeContext = '\n\n### База знаний (используй эту информацию в ответах):\n';
+            knowledgeEntries.forEach((entry: any) => {
+                knowledgeContext += `\n[${entry.category.toUpperCase()}] ${entry.title}:\n${entry.content}\n`;
+            });
+        }
+
+        // Construct context with recent history
         const history = await MessageLog.find({ userId }).sort({ timestamp: -1 }).limit(10);
         const historyText = history.reverse().map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
 
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-        const prompt = `${systemPrompt}\n\nChat History:\n${historyText}\n\nUser: ${userText}\nAssistant:`;
+        const prompt = `${systemPrompt}${knowledgeContext}\n\n### История чата:\n${historyText}\n\nUser: ${userText}\nAssistant:`;
 
         const result = await model.generateContent(prompt);
         const response = result.response;
