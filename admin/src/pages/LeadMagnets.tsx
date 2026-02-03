@@ -36,7 +36,18 @@ const LeadMagnets = () => {
     // Auto-generate slug/triggerId from name
     useEffect(() => {
         if (isAutoSlug && name) {
+            const rusToLat: Record<string, string> = {
+                'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+                'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+                'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
+                'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu',
+                'я': 'ya'
+            };
+
             const slug = name.toLowerCase()
+                .split('')
+                .map(char => rusToLat[char] || char)
+                .join('')
                 .replace(/ /g, '_')
                 .replace(/[^\w-]+/g, '');
             setTriggerId(slug);
@@ -190,8 +201,7 @@ const LeadMagnets = () => {
                     </div>
 
                     <button
-                        type="button" // Change to submit
-                        onClick={handleCreate}
+                        type="submit"
                         disabled={creating}
                         className="btn-primary w-full flex justify-center items-center gap-2 mt-4"
                     >
