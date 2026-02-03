@@ -46,11 +46,18 @@ bot.command("start", async (ctx) => {
 
     // Admin Menu Handling
     if (userId && ADMIN_IDS.includes(userId)) {
-        await ctx.setChatMenuButton({
-            type: "web_app",
-            text: "Admin Panel",
-            web_app: { url: WEBAPP_URL }
-        });
+        console.log(`Setting Admin Menu for user ${userId} with URL ${WEBAPP_URL}`);
+        try {
+            await ctx.setChatMenuButton({
+                type: "web_app",
+                text: "Admin Panel",
+                web_app: { url: WEBAPP_URL }
+            });
+        } catch (err) {
+            console.error("Failed to set admin menu:", err);
+        }
+    } else {
+        console.log(`User ${userId} is not an admin. Admins: ${ADMIN_IDS.join(', ')}`);
     }
 
     if (payload) {
@@ -62,9 +69,9 @@ bot.command("start", async (ctx) => {
                 { $addToSet: { consumedMagnets: magnet.triggerId } }
             );
 
-            const welcomeMsg = magnet.welcomeMessage || `Here is your content: ${magnet.name}\n\n${magnet.description}`;
+            const welcomeMsg = magnet.welcomeMessage || `Вот ваш контент: ${magnet.name}\n\n${magnet.description}`;
 
-            await ctx.reply(`${welcomeMsg}\n\n[Download/Access Here](${magnet.link})`, { parse_mode: "Markdown" });
+            await ctx.reply(`${welcomeMsg}\n\n[Скачать/Открыть](${magnet.link})`, { parse_mode: "Markdown" });
             await logMessage(userId!, 'assistant', `Sent Lead Magnet: ${magnet.name}`);
 
             // Simple immediate follow-up simulation
@@ -79,7 +86,7 @@ bot.command("start", async (ctx) => {
         }
     }
 
-    await ctx.reply("Welcome! How can I help you today?");
+    await ctx.reply("Добро пожаловать! Я ваш персональный помощник. Чем могу помочь?");
 });
 
 bot.on("message:text", async (ctx) => {
