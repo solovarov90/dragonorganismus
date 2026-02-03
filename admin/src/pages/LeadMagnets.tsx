@@ -225,7 +225,6 @@ const LeadMagnets = () => {
                                                 }
 
                                                 // Show loading state
-                                                const originalText = e.target.closest('div')?.innerText;
                                                 // (Simplistic loading indication)
                                                 setContent("Загрузка...");
 
