@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash, Edit } from 'lucide-react';
-import { LeadMagnet } from '../types';
+import type { LeadMagnet } from '../types';
 import { api } from '../api';
 
 const LeadMagnets = () => {

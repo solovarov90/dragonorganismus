@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import { User } from '../types';
+import type { User } from '../types';
 import ChatViewer from '../components/ChatViewer';
 import { MessageSquare } from 'lucide-react';
 

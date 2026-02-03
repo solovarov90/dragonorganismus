@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import { MessageLog } from '../types';
+import type { MessageLog } from '../types';
 import { X } from 'lucide-react';
 
 interface Props {
