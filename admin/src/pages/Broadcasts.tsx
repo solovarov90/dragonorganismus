@@ -152,17 +152,16 @@ const Broadcasts = () => {
                     {attachmentType !== 'text' && (
                         <div className="space-y-2 animate-in slide-in-from-left">
                             <label className="text-sm font-medium text-text-muted">
-                                {attachmentType === 'photo' ? 'Ссылка на фото или File ID' : 'Ссылка на документ или File ID'}
+                                {attachmentType === 'photo' ? 'Ссылка на фото, File ID или Загрузка' : 'Ссылка на документ, File ID или Загрузка'}
                             </label>
-                            <div className="flex items-center gap-2 bg-surface rounded-lg border border-border px-3">
-                                <Paperclip size={18} className="text-text-muted" />
-                                <input
-                                    className="bg-transparent border-none focus:ring-0 text-text w-full py-2"
-                                    placeholder="https://... или AgACAg... (или выберите файл)"
-                                    value={attachment}
-                                    onChange={(e) => setAttachment(e.target.value)}
-                                />
-                                <label className="cursor-pointer p-1 hover:bg-primary/20 rounded transition-colors" title="Загрузить файл">
+
+                            <div className="mb-2 p-3 bg-surface border border-dashed border-border rounded-lg">
+                                <label className="flex flex-col items-center justify-center cursor-pointer hover:bg-surface/50 transition-colors">
+                                    <div className="flex flex-col items-center gap-2 text-text-muted">
+                                        <Paperclip size={24} />
+                                        <span className="text-xs">Нажмите для загрузки файла (до 4MB)</span>
+                                        <span className="text-[10px] text-text-muted/50">Файл будет сохранен в Telegram Cloud</span>
+                                    </div>
                                     <input
                                         type="file"
                                         className="hidden"
@@ -170,12 +169,12 @@ const Broadcasts = () => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
 
-                                            // 4MB limit for Serverless Function body
                                             if (file.size > 4 * 1024 * 1024) {
-                                                alert("Файл слишком большой (макс 4MB). Используйте File ID для больших файлов.");
+                                                alert("Файл слишком большой. Максимум 4MB для этого метода.");
                                                 return;
                                             }
 
+                                            // Show loading state
                                             setAttachment("Загрузка...");
 
                                             const reader = new FileReader();
@@ -186,20 +185,28 @@ const Broadcasts = () => {
                                                     const res = await api.post('/upload', {
                                                         fileBase64: base64,
                                                         filename: file.name,
-                                                        type: attachmentType // hint to backend
+                                                        type: attachmentType
                                                     });
                                                     setAttachment(res.data.fileId);
-                                                    // Optional: setAttachmentType based on file?
+                                                    alert("Файл успешно загружен! File ID получен.");
                                                 } catch (err) {
                                                     console.error(err);
+                                                    alert("Ошибка загрузки файла");
                                                     setAttachment("");
-                                                    alert("Ошибка загрузки");
                                                 }
                                             };
                                         }}
                                     />
-                                    <div className="text-primary text-xs font-bold border border-primary px-2 py-0.5 rounded">URL/File</div>
                                 </label>
+                            </div>
+
+                            <div className="flex items-center gap-2 bg-surface rounded-lg border border-border px-3">
+                                <input
+                                    className="bg-transparent border-none focus:ring-0 text-text w-full py-2"
+                                    placeholder="https://... или AgACAg... (или загрузите файл выше)"
+                                    value={attachment}
+                                    onChange={(e) => setAttachment(e.target.value)}
+                                />
                             </div>
                             <p className="text-xs text-text-muted">
                                 Можно использовать прямую ссылку или Telegram File ID (рекомендуется для скорости).
