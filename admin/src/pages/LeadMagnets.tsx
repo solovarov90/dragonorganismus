@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash, Edit, Link as LinkIcon, FileText, File, Sparkles, Copy } from 'lucide-react';
+import { Plus, Trash, Edit, Link as LinkIcon, FileText, File, Sparkles, Copy, Paperclip } from 'lucide-react';
 import type { LeadMagnet } from '../types';
 import { api } from '../api';
 
@@ -201,14 +201,63 @@ const LeadMagnets = () => {
                         {/* Content Input */}
                         <div className="col-span-2 space-y-2">
                             <label className="text-sm font-medium text-text-muted">
-                                {type === 'link' ? 'Ссылка' : type === 'text' ? 'Текст сообщения' : 'File ID или Ссылка'}
+                                {type === 'link' ? 'Ссылка' : type === 'text' ? 'Текст сообщения' : 'Ссылка, File ID или Загрузка файла'}
                             </label>
+
+                            {type === 'file' && (
+                                <div className="mb-2 p-3 bg-surface border border-dashed border-border rounded-lg">
+                                    <label className="flex flex-col items-center justify-center cursor-pointer hover:bg-surface/50 transition-colors">
+                                        <div className="flex flex-col items-center gap-2 text-text-muted">
+                                            <Paperclip size={24} />
+                                            <span className="text-xs">Нажмите для загрузки файла (до 4MB)</span>
+                                            <span className="text-[10px] text-text-muted/50">Файл будет сохранен в Telegram Cloud</span>
+                                        </div>
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+
+                                                if (file.size > 4 * 1024 * 1024) {
+                                                    alert("Файл слишком большой. Максимум 4MB для этого метода.");
+                                                    return;
+                                                }
+
+                                                // Show loading state
+                                                const originalText = e.target.closest('div')?.innerText;
+                                                // (Simplistic loading indication)
+                                                setContent("Загрузка...");
+
+                                                const reader = new FileReader();
+                                                reader.readAsDataURL(file);
+                                                reader.onload = async () => {
+                                                    const base64 = reader.result?.toString().split(',')[1];
+                                                    try {
+                                                        const res = await api.post('/upload', {
+                                                            fileBase64: base64,
+                                                            filename: file.name
+                                                        });
+                                                        setContent(res.data.fileId);
+                                                        alert("Файл успешно загружен! File ID получен.");
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                        alert("Ошибка загрузки файла");
+                                                        setContent("");
+                                                    }
+                                                };
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+                            )}
+
                             <input
                                 className="input-field"
                                 placeholder={
                                     type === 'link' ? 'https://example.com' :
                                         type === 'text' ? 'Ваш секретный текст...' :
-                                            'BQACAgIAAxkBAA...'
+                                            'BQACAgIAAxkBAA... (или загрузите файл выше)'
                                 }
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}

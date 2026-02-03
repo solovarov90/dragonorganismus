@@ -158,10 +158,48 @@ const Broadcasts = () => {
                                 <Paperclip size={18} className="text-text-muted" />
                                 <input
                                     className="bg-transparent border-none focus:ring-0 text-text w-full py-2"
-                                    placeholder="https://... или AgACAg..."
+                                    placeholder="https://... или AgACAg... (или выберите файл)"
                                     value={attachment}
                                     onChange={(e) => setAttachment(e.target.value)}
                                 />
+                                <label className="cursor-pointer p-1 hover:bg-primary/20 rounded transition-colors" title="Загрузить файл">
+                                    <input
+                                        type="file"
+                                        className="hidden"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+
+                                            // 4MB limit for Serverless Function body
+                                            if (file.size > 4 * 1024 * 1024) {
+                                                alert("Файл слишком большой (макс 4MB). Используйте File ID для больших файлов.");
+                                                return;
+                                            }
+
+                                            setAttachment("Загрузка...");
+
+                                            const reader = new FileReader();
+                                            reader.readAsDataURL(file);
+                                            reader.onload = async () => {
+                                                const base64 = reader.result?.toString().split(',')[1];
+                                                try {
+                                                    const res = await api.post('/upload', {
+                                                        fileBase64: base64,
+                                                        filename: file.name,
+                                                        type: attachmentType // hint to backend
+                                                    });
+                                                    setAttachment(res.data.fileId);
+                                                    // Optional: setAttachmentType based on file?
+                                                } catch (err) {
+                                                    console.error(err);
+                                                    setAttachment("");
+                                                    alert("Ошибка загрузки");
+                                                }
+                                            };
+                                        }}
+                                    />
+                                    <div className="text-primary text-xs font-bold border border-primary px-2 py-0.5 rounded">URL/File</div>
+                                </label>
                             </div>
                             <p className="text-xs text-text-muted">
                                 Можно использовать прямую ссылку или Telegram File ID (рекомендуется для скорости).

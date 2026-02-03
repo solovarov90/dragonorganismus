@@ -162,22 +162,21 @@ bot.command("start", async (ctx) => {
                     await logMessage(userId!, 'assistant', `Follow-up: ${msg}`);
                 }
             }
-        }
 
-        const menu = getMainMenu(ADMIN_IDS.includes(userId!));
-        await ctx.reply("Главное меню:", { reply_markup: menu });
-        return;
+            const menu = getMainMenu(ADMIN_IDS.includes(userId!));
+            await ctx.reply("Главное меню:", { reply_markup: menu });
+            return;
+        }
     }
-}
 
     // Standard Start Notification
     await notifyAdmins(`🏃 **Новый старт бота**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})`);
-await logEvent('bot_start', userId!, 'User started bot');
+    await logEvent('bot_start', userId!, 'User started bot');
 
-const menu = getMainMenu(ADMIN_IDS.includes(userId!));
-await ctx.reply("👋 Добро пожаловать! Выберите действие в меню:", {
-    reply_markup: menu
-});
+    const menu = getMainMenu(ADMIN_IDS.includes(userId!));
+    await ctx.reply("👋 Добро пожаловать! Выберите действие в меню:", {
+        reply_markup: menu
+    });
 });
 
 const getMainMenu = (isAdmin: boolean) => {
