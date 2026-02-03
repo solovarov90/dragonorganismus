@@ -113,8 +113,25 @@ bot.on("message:text", async (ctx) => {
     }
 });
 
+// Webhook handler
 export const handler = async (event: any, context: any) => {
-    await connectDB();
-    const callback = webhookCallback(bot, "netlify");
-    return callback(event, context);
+    try {
+        await connectDB();
+
+        // Ensure bot info is initialized
+        if (!bot.isInited()) {
+            await bot.init();
+        }
+
+        // Create callback with 'aws-lambda' adapter (Netlify Functions use AWS Lambda under hood)
+        const callback = webhookCallback(bot, "aws-lambda");
+
+        return await callback(event, context);
+    } catch (error) {
+        console.error("Webhook Error:", error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: "Internal Server Error" }),
+        };
+    }
 };
