@@ -1,13 +1,14 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, Activity } from 'lucide-react';
 
 const Layout = () => {
     const location = useLocation();
 
     const navItems = [
         { path: '/', label: 'Дашборд', icon: LayoutDashboard },
-        { path: '/lead-magnets', label: 'Лид-магниты', icon: FileText },
+        { path: '/lead-magnets', label: 'Магниты', icon: FileText },
         { path: '/context', label: 'Контекст', icon: Settings },
+        { path: '/logs', label: 'Логи', icon: Activity },
     ];
 
     return (
@@ -36,8 +37,8 @@ const Layout = () => {
                             key={path}
                             to={path}
                             className={`flex flex-col items-center p-2 text-xs transition-all duration-300 ${isActive
-                                    ? 'text-primary scale-110 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                                    : 'text-text-muted hover:text-text'
+                                ? 'text-primary scale-110 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                                : 'text-text-muted hover:text-text'
                                 }`}
                         >
                             <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />

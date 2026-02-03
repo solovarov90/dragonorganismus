@@ -40,9 +40,30 @@ const logMessage = async (userId: string, role: 'user' | 'assistant', text: stri
     }
 };
 
+import { SystemLog } from "./models/SystemLog";
+
+const notifyAdmins = async (message: string) => {
+    for (const adminId of ADMIN_IDS) {
+        try {
+            await bot.api.sendMessage(adminId, message, { parse_mode: "Markdown" });
+        } catch (e) {
+            console.error(`Failed to notify admin ${adminId}:`, e);
+        }
+    }
+};
+
+const logEvent = async (type: string, userId: string, details: string, metadata?: any) => {
+    try {
+        await SystemLog.create({ type, userId, details, metadata });
+    } catch (e) {
+        console.error("Failed to write system log:", e);
+    }
+};
+
 bot.command("start", async (ctx) => {
     const payload = ctx.match; // Deep link payload
     const userId = ctx.from?.id.toString();
+    const username = ctx.from?.username ? `@${ctx.from.username}` : (ctx.from?.first_name || 'Unknown');
 
     // Admin Menu Handling
     if (userId && ADMIN_IDS.includes(userId)) {
@@ -75,6 +96,11 @@ bot.command("start", async (ctx) => {
                 { telegramId: userId },
                 { $addToSet: { consumedMagnets: magnet.triggerId } }
             );
+
+            // Notify Admins & Log
+            const notificationMsg = `🧲 **Новый лид!**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})\n📦 Магнит: ${magnet.name}\n🆔 Trigger: ${payload}`;
+            await notifyAdmins(notificationMsg);
+            await logEvent('lead_magnet_consumed', userId!, `Consumed magnet: ${magnet.name}`, { magnetId: magnet._id, triggerId: payload });
 
             const welcomeMsg = magnet.welcomeMessage || `Вот ваш контент: ${magnet.name}\n\n${magnet.description}`;
 
@@ -109,6 +135,10 @@ bot.command("start", async (ctx) => {
             return;
         }
     }
+
+    // Standard Start Notification
+    await notifyAdmins(`🏃 **Новый старт бота**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})`);
+    await logEvent('bot_start', userId!, 'User started bot');
 
     await ctx.reply("Добро пожаловать! Я ваш персональный помощник. Чем могу помочь?");
 });
