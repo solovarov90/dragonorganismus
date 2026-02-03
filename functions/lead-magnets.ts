@@ -51,5 +51,23 @@ export const handler: Handler = async (event, context) => {
         return { statusCode: 500, headers, body: JSON.stringify({ error: (error as Error).message }) };
     }
 
+    if (event.httpMethod === 'DELETE') {
+        try {
+            const id = event.queryStringParameters?.id;
+            if (!id) {
+                return { statusCode: 400, headers, body: JSON.stringify({ error: "Missing id parameter" }) };
+            }
+
+            const deleted = await LeadMagnet.findByIdAndDelete(id);
+            if (!deleted) {
+                return { statusCode: 404, headers, body: JSON.stringify({ error: "Magnet not found" }) };
+            }
+
+            return { statusCode: 200, headers, body: JSON.stringify({ message: "Deleted successfully" }) };
+        } catch (error) {
+            return { statusCode: 500, headers, body: JSON.stringify({ error: (error as Error).message }) };
+        }
+    }
+
     return { statusCode: 405, headers, body: 'Make sure to use GET or POST' };
 };

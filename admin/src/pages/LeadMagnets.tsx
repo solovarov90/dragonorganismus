@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash, Edit, Link as LinkIcon, FileText, File, Sparkles } from 'lucide-react';
+import { Plus, Trash, Edit, Link as LinkIcon, FileText, File, Sparkles, Copy } from 'lucide-react';
 import type { LeadMagnet } from '../types';
 import { api } from '../api';
 
@@ -90,6 +90,24 @@ const LeadMagnets = () => {
             alert(`Ошибка: ${msg}`);
             setCreating(false);
         }
+    };
+
+    const handleDelete = async (id: string, name: string) => {
+        if (!window.confirm(`Вы уверены, что хотите удалить лид-магнит "${name}"?`)) return;
+
+        try {
+            await api.delete(`/lead-magnets?id=${id}`);
+            fetchMagnets();
+        } catch (err) {
+            console.error(err);
+            alert('Ошибка при удалении');
+        }
+    };
+
+    const handleCopy = (triggerId: string) => {
+        const link = `https://t.me/DragonOrganismusBot?start=${triggerId}`;
+        navigator.clipboard.writeText(link);
+        alert('Ссылка скопирована!');
     };
 
     return (
@@ -258,8 +276,21 @@ const LeadMagnets = () => {
                         {magnets.map((m) => (
                             <div key={m._id} className="glass-panel p-4 hover:border-primary/50 transition-colors group relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                    <button
+                                        className="text-text-muted hover:text-primary"
+                                        title="Копировать ссылку"
+                                        onClick={() => handleCopy(m.triggerId)}
+                                    >
+                                        <Copy size={16} />
+                                    </button>
                                     <button className="text-text-muted hover:text-primary"><Edit size={16} /></button>
-                                    <button className="text-text-muted hover:text-red-500"><Trash size={16} /></button>
+                                    <button
+                                        className="text-text-muted hover:text-red-500"
+                                        onClick={() => handleDelete(m._id, m.name)}
+                                        title="Удалить"
+                                    >
+                                        <Trash size={16} />
+                                    </button>
                                 </div>
 
                                 <div className="flex items-start gap-3">
