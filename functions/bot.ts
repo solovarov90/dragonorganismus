@@ -1,4 +1,4 @@
-import { Bot, webhookCallback } from "grammy";
+import { Bot, webhookCallback, Keyboard, InlineKeyboard } from "grammy";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
 import { connectDB } from "./utils/db";
@@ -146,8 +146,23 @@ bot.command("start", async (ctx) => {
     await notifyAdmins(`🏃 **Новый старт бота**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})`);
     await logEvent('bot_start', userId!, 'User started bot');
 
-    await ctx.reply("Добро пожаловать! Я ваш персональный помощник. Чем могу помочь?");
+    const menu = getMainMenu(ADMIN_IDS.includes(userId!));
+    await ctx.reply("Добро пожаловать! Я ваш персональный помощник. Чем могу помочь?", {
+        reply_markup: menu
+    });
 });
+
+const getMainMenu = (isAdmin: boolean) => {
+    const keyboard = new Keyboard()
+        .text("🐉 Поговорить")
+        .text("💎 Сокровища");
+
+    if (isAdmin) {
+        keyboard.row().webApp("🏔️ Пещера", WEBAPP_URL);
+    }
+
+    return keyboard.resized();
+};
 
 bot.on("message:text", async (ctx) => {
     const userId = ctx.from.id.toString();
@@ -155,6 +170,37 @@ bot.on("message:text", async (ctx) => {
     const isAdmin = ADMIN_IDS.includes(userId);
 
     await logMessage(userId, 'user', userText);
+
+    // MENU HANDLING
+    if (userText === "🐉 Поговорить") {
+        await ctx.reply("Я вас внимательно слушаю! Спрашивайте о чем угодно.", {
+            reply_markup: getMainMenu(isAdmin)
+        });
+        return;
+    }
+
+    if (userText === "💎 Сокровища") {
+        const user = await User.findOne({ telegramId: userId });
+        const magnets = user?.consumedMagnets || [];
+
+        if (magnets.length === 0) {
+            await ctx.reply("У вас пока нет сокровищ (лид-магнитов). Следите за новостями!", {
+                reply_markup: getMainMenu(isAdmin)
+            });
+            return;
+        }
+
+        const magnetDocs = await LeadMagnet.find({ triggerId: { $in: magnets } });
+
+        await ctx.reply("Вот ваши собранные сокровища:", {
+            reply_markup: {
+                inline_keyboard: magnetDocs.map(m => ([
+                    { text: `📥 ${m.name}`, url: `https://t.me/DragonOrganismusBot?start=${m.triggerId}` }
+                ]))
+            }
+        });
+        return;
+    }
 
     try {
         // Check for /learn command (admin only)
@@ -273,7 +319,14 @@ bot.on("message:text", async (ctx) => {
 
         // NORMAL MODE: Regular AI chat
         const systemPromptDoc = await Context.findOne({ key: 'main_system_prompt' });
-        const systemPrompt = systemPromptDoc ? systemPromptDoc.value : "You are a helpful assistant.";
+        const defaultPrompt = `Ты — Цифровой Двойник автора (эксперта). 
+Твоя задача — общаться с пользователями от имени автора, используя его стиль и знания.
+1. Никогда не начинай ответ со слов "Я искусственный интеллект" или "Как языковая модель".
+2. Отвечай кратко, по делу, в стиле Telegram-переписки.
+3. Используй информацию из БАЗЫ ЗНАНИЙ (ниже) для ответов. Если информации нет, попробуй ответить, исходя из логики, или честно скажи, что пока не обсуждал это с автором.
+4. Твоя цель — прогревать аудиторию, делиться пользой и вести к целевому действию (получение лид-магнита или продажа).`;
+
+        const systemPrompt = systemPromptDoc ? systemPromptDoc.value : defaultPrompt;
 
         // Fetch Knowledge Base entries
         const { KnowledgeEntry } = await import('./models/KnowledgeEntry');
@@ -294,13 +347,25 @@ bot.on("message:text", async (ctx) => {
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-        const prompt = `${systemPrompt}${knowledgeContext}\n\n### История чата:\n${historyText}\n\nUser: ${userText}\nAssistant:`;
+        const prompt = `${systemPrompt}${knowledgeContext}\n\nВАЖНО: ИСПОЛЬЗУЙ Telegram Markdown для форматирования (жирный шрифт через *, списки). Не используй # заголовки, они не поддерживаются.\n\n### История чата:\n${historyText}\n\nUser: ${userText}\nAssistant:`;
 
         const result = await model.generateContent(prompt);
         const response = result.response;
         const text = response.text();
 
-        await ctx.reply(text);
+        try {
+            await ctx.reply(text, {
+                parse_mode: "Markdown",
+                reply_markup: getMainMenu(isAdmin)
+            });
+        } catch (e) {
+            // Fallback if Markdown fails
+            console.error("Markdown parse error:", e);
+            await ctx.reply(text, {
+                reply_markup: getMainMenu(isAdmin)
+            });
+        }
+
         await logMessage(userId, 'assistant', text);
     } catch (error) {
         console.error("AI Error:", error);
