@@ -8,6 +8,7 @@ export interface IUser extends Document {
     createdAt: Date;
     lastInteraction: Date;
     consumedMagnets: string[];
+    learningMode?: boolean;
 }
 
 const UserSchema: Schema = new Schema({
@@ -18,6 +19,7 @@ const UserSchema: Schema = new Schema({
     createdAt: { type: Date, default: Date.now },
     lastInteraction: { type: Date, default: Date.now },
     consumedMagnets: [{ type: String }],
+    learningMode: { type: Boolean, default: false },
 });
 
 export const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);

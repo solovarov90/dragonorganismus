@@ -116,10 +116,126 @@ bot.command("start", async (ctx) => {
 bot.on("message:text", async (ctx) => {
     const userId = ctx.from.id.toString();
     const userText = ctx.message.text;
+    const isAdmin = ADMIN_IDS.includes(userId);
 
     await logMessage(userId, 'user', userText);
 
     try {
+        // Check for /learn command (admin only)
+        if (userText.startsWith('/learn') && isAdmin) {
+            await ctx.reply(
+                "🎓 **Режим обучения включен!**\n\n" +
+                "Теперь расскажите мне о себе, вашем продукте, услугах, ценах, стиле общения — всё, что я должен знать.\n\n" +
+                "Я буду выделять ключевые факты и предлагать их на одобрение. После одобрения они попадут в базу знаний.\n\n" +
+                "Напишите `/stop` чтобы выйти из режима обучения.",
+                { parse_mode: "Markdown" }
+            );
+            // Mark user as in learning mode
+            await User.findOneAndUpdate(
+                { telegramId: userId },
+                { $set: { learningMode: true } }
+            );
+            return;
+        }
+
+        // Check for /stop command
+        if (userText === '/stop' && isAdmin) {
+            await User.findOneAndUpdate(
+                { telegramId: userId },
+                { $set: { learningMode: false } }
+            );
+            await ctx.reply("✅ Режим обучения отключен. Теперь я обычный помощник.");
+            return;
+        }
+
+        // Check if admin is in learning mode
+        const user = await User.findOne({ telegramId: userId });
+        const isLearningMode = isAdmin && user?.learningMode;
+
+        if (isLearningMode) {
+            // LEARNING MODE: Extract facts using AI
+            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+            const extractPrompt = `Ты — продюсер экспертов. Твоя задача — извлекать ключевые факты из информации, которую дает эксперт.
+
+Проанализируй следующее сообщение от эксперта и выдели 1-3 ключевых факта для добавления в базу знаний.
+
+Для каждого факта укажи:
+1. CATEGORY: одна из [author, product, faq, expertise, tone, rules]
+   - author: информация об авторе/эксперте
+   - product: продукты, услуги, цены
+   - faq: частые вопросы и ответы
+   - expertise: профессиональные знания
+   - tone: стиль общения, фразы
+   - rules: ограничения, что НЕ говорить
+2. TITLE: краткий заголовок (до 50 символов)
+3. CONTENT: полное содержание факта
+
+Формат ответа (JSON массив):
+[{"category": "...", "title": "...", "content": "..."}]
+
+Если в сообщении нет полезной информации для базы знаний, верни пустой массив: []
+
+Сообщение эксперта:
+"${userText}"`;
+
+            const result = await model.generateContent(extractPrompt);
+            const responseText = result.response.text();
+
+            // Parse JSON from response
+            const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                try {
+                    const facts = JSON.parse(jsonMatch[0]);
+
+                    if (facts.length === 0) {
+                        await ctx.reply("🤔 Не нашел конкретных фактов в этом сообщении. Расскажите подробнее или попробуйте другую тему.");
+                        return;
+                    }
+
+                    // Send each fact for approval
+                    for (const fact of facts) {
+                        const categoryLabels: Record<string, string> = {
+                            author: '🧑‍💼 Автор',
+                            product: '📦 Продукт',
+                            faq: '❓ FAQ',
+                            expertise: '📚 Экспертиза',
+                            tone: '💬 Тон общения',
+                            rules: '📋 Правила'
+                        };
+
+                        const label = categoryLabels[fact.category] || fact.category;
+
+                        await ctx.reply(
+                            `📝 **Новый факт для базы знаний:**\n\n` +
+                            `**Категория:** ${label}\n` +
+                            `**Заголовок:** ${fact.title}\n\n` +
+                            `${fact.content}`,
+                            {
+                                parse_mode: "Markdown",
+                                reply_markup: {
+                                    inline_keyboard: [[
+                                        { text: "✅ Добавить", callback_data: `kb_add:${fact.category}:${Buffer.from(fact.title).toString('base64').slice(0, 30)}` },
+                                        { text: "❌ Отклонить", callback_data: "kb_reject" }
+                                    ]]
+                                }
+                            }
+                        );
+
+                        // Store pending fact in user's session (using a simple approach via message)
+                        // We'll extract from the message text on callback
+                    }
+                } catch (parseErr) {
+                    console.error("Failed to parse AI response:", parseErr);
+                    await ctx.reply("Не смог обработать ответ. Попробуйте переформулировать.");
+                }
+            } else {
+                await ctx.reply("🤔 Не нашел конкретных фактов. Расскажите что-то конкретное о себе или продукте.");
+            }
+            return;
+        }
+
+        // NORMAL MODE: Regular AI chat
         const systemPromptDoc = await Context.findOne({ key: 'main_system_prompt' });
         const systemPrompt = systemPromptDoc ? systemPromptDoc.value : "You are a helpful assistant.";
 
@@ -153,6 +269,60 @@ bot.on("message:text", async (ctx) => {
     } catch (error) {
         console.error("AI Error:", error);
         await ctx.reply("У меня возникли трудности с ответом. Попробуйте чуть позже.");
+    }
+});
+
+// Handle callback queries for knowledge approval
+bot.on("callback_query:data", async (ctx) => {
+    const data = ctx.callbackQuery.data;
+
+    if (data === "kb_reject") {
+        await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+        await ctx.answerCallbackQuery({ text: "❌ Отклонено" });
+        return;
+    }
+
+    if (data.startsWith("kb_add:")) {
+        try {
+            // Extract info from the message
+            const message = ctx.callbackQuery.message;
+            if (!message || !('text' in message)) {
+                await ctx.answerCallbackQuery({ text: "Ошибка: сообщение недоступно" });
+                return;
+            }
+
+            const text = message.text;
+
+            // Parse category from callback data
+            const parts = data.split(":");
+            const category = parts[1];
+
+            // Extract title and content from message text
+            const titleMatch = text.match(/\*\*Заголовок:\*\* (.+)/);
+            const title = titleMatch ? titleMatch[1] : "Без заголовка";
+
+            // Content is everything after the title line
+            const contentStart = text.indexOf(title) + title.length;
+            const content = text.slice(contentStart).trim();
+
+            // Save to Knowledge Base
+            const { KnowledgeEntry } = await import('./models/KnowledgeEntry');
+            await KnowledgeEntry.create({
+                category,
+                title,
+                content,
+                keywords: []
+            });
+
+            await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+            await ctx.answerCallbackQuery({ text: "✅ Добавлено в базу знаний!" });
+
+            // Also send a confirmation
+            await ctx.reply(`✅ Факт "${title}" добавлен в категорию ${category.toUpperCase()}`);
+        } catch (err) {
+            console.error("Failed to save knowledge:", err);
+            await ctx.answerCallbackQuery({ text: "Ошибка сохранения" });
+        }
     }
 });
 

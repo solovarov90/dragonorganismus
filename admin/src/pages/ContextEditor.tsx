@@ -1,12 +1,29 @@
-import { useState, useEffect } from 'react';
-import { Save, Bot, Plus, Trash, Edit, X, Brain } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Send, Bot, Plus, Trash, Edit, X, Brain, Check, XCircle } from 'lucide-react';
 import { api } from '../api';
 import type { KnowledgeEntry, KnowledgeCategory } from '../types';
 import { CATEGORY_CONFIG } from '../types';
 
+interface ChatMessage {
+    role: 'user' | 'agent';
+    text: string;
+}
+
+interface PendingFact {
+    category: KnowledgeCategory;
+    title: string;
+    content: string;
+}
+
 const ContextEditor = () => {
-    const [context, setContext] = useState("");
-    const [loading, setLoading] = useState(false);
+    // Chat State
+    const [messages, setMessages] = useState<ChatMessage[]>([
+        { role: 'agent', text: 'Привет! Я твой продюсер. Расскажи мне о себе — кто ты, чем занимаешься, какие у тебя продукты и услуги. Я помогу сформировать твой цифровой портрет.' }
+    ]);
+    const [inputText, setInputText] = useState('');
+    const [sending, setSending] = useState(false);
+    const [pendingFacts, setPendingFacts] = useState<PendingFact[]>([]);
+    const chatEndRef = useRef<HTMLDivElement>(null);
 
     // Knowledge Base State
     const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
@@ -24,9 +41,12 @@ const ContextEditor = () => {
     });
 
     useEffect(() => {
-        api.get('/context').then(res => setContext(res.data.value || '')).catch(console.error);
         fetchEntries();
     }, []);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     const fetchEntries = async () => {
         try {
@@ -39,17 +59,52 @@ const ContextEditor = () => {
         }
     };
 
-    const handleSaveContext = async () => {
-        setLoading(true);
+    const handleSendMessage = async () => {
+        if (!inputText.trim() || sending) return;
+
+        const userMessage = inputText.trim();
+        setInputText('');
+        setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+        setSending(true);
+
         try {
-            await api.post('/context', { key: 'main_system_prompt', value: context });
-            alert("Сохранено!");
+            const res = await api.post('/agent-chat', {
+                message: userMessage,
+                history: messages
+            });
+
+            const { reply, facts } = res.data;
+
+            setMessages(prev => [...prev, { role: 'agent', text: reply }]);
+
+            if (facts && facts.length > 0) {
+                setPendingFacts(prev => [...prev, ...facts]);
+            }
         } catch (err) {
             console.error(err);
-            alert("Ошибка сохранения");
+            setMessages(prev => [...prev, { role: 'agent', text: 'Произошла ошибка. Попробуй еще раз.' }]);
         } finally {
-            setLoading(false);
+            setSending(false);
         }
+    };
+
+    const handleApproveFact = async (fact: PendingFact, index: number) => {
+        try {
+            await api.post('/knowledge', {
+                category: fact.category,
+                title: fact.title,
+                content: fact.content,
+                keywords: []
+            });
+            setPendingFacts(prev => prev.filter((_, i) => i !== index));
+            fetchEntries();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleRejectFact = (index: number) => {
+        setPendingFacts(prev => prev.filter((_, i) => i !== index));
     };
 
     const openModal = (entry?: KnowledgeEntry) => {
@@ -105,33 +160,85 @@ const ContextEditor = () => {
 
     return (
         <div className="space-y-8 pb-20">
-            {/* System Prompt Section */}
+            {/* Chat Section */}
             <div className="glass-panel p-6 shadow-neon/10">
-                <div className="flex items-center gap-3 mb-6 text-accent">
+                <div className="flex items-center gap-3 mb-4 text-accent">
                     <Bot size={28} />
                     <div>
-                        <h2 className="text-xl font-bold font-mono">Системный промпт</h2>
-                        <p className="text-xs text-text-muted">Базовая инструкция для ИИ</p>
+                        <h2 className="text-xl font-bold font-mono">Продюсер</h2>
+                        <p className="text-xs text-text-muted">Расскажи о себе — я сформирую твой портрет</p>
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <textarea
-                        className="input-field min-h-[200px] font-mono text-sm leading-relaxed"
-                        value={context}
-                        onChange={(e) => setContext(e.target.value)}
-                        placeholder="Ты — экспертный помощник..."
-                    />
-                    <div className="flex justify-end">
-                        <button
-                            onClick={handleSaveContext}
-                            disabled={loading}
-                            className="btn-primary flex items-center gap-2"
-                        >
-                            <Save size={18} />
-                            {loading ? 'Сохранение...' : 'Сохранить'}
-                        </button>
+                {/* Chat Messages */}
+                <div className="bg-surface/50 rounded-xl p-4 h-[300px] overflow-y-auto mb-4 space-y-3">
+                    {messages.map((msg, i) => (
+                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] px-4 py-2 rounded-2xl ${msg.role === 'user'
+                                    ? 'bg-primary/20 text-text rounded-br-sm'
+                                    : 'bg-surface text-text rounded-bl-sm'
+                                }`}>
+                                {msg.text}
+                            </div>
+                        </div>
+                    ))}
+                    {sending && (
+                        <div className="flex justify-start">
+                            <div className="bg-surface text-text-muted px-4 py-2 rounded-2xl rounded-bl-sm animate-pulse">
+                                Думаю...
+                            </div>
+                        </div>
+                    )}
+                    <div ref={chatEndRef} />
+                </div>
+
+                {/* Pending Facts */}
+                {pendingFacts.length > 0 && (
+                    <div className="mb-4 space-y-2">
+                        <p className="text-xs text-text-muted font-bold uppercase tracking-wider">Найденные факты:</p>
+                        {pendingFacts.map((fact, i) => {
+                            const cfg = CATEGORY_CONFIG[fact.category];
+                            return (
+                                <div key={i} className="bg-surface/80 rounded-lg p-3 border-l-4 flex items-start gap-3" style={{ borderLeftColor: cfg?.color || '#888' }}>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-sm">{cfg?.icon}</span>
+                                            <span className="text-xs font-bold" style={{ color: cfg?.color }}>{cfg?.label}</span>
+                                        </div>
+                                        <p className="font-bold text-sm text-text">{fact.title}</p>
+                                        <p className="text-xs text-text-muted">{fact.content.slice(0, 100)}...</p>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => handleApproveFact(fact, i)} className="p-2 bg-primary/20 rounded-lg hover:bg-primary/40 text-primary">
+                                            <Check size={16} />
+                                        </button>
+                                        <button onClick={() => handleRejectFact(i)} className="p-2 bg-red-500/20 rounded-lg hover:bg-red-500/40 text-red-400">
+                                            <XCircle size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
+                )}
+
+                {/* Input */}
+                <div className="flex gap-2">
+                    <input
+                        className="input-field flex-1"
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        placeholder="Расскажи о себе..."
+                        disabled={sending}
+                    />
+                    <button
+                        onClick={handleSendMessage}
+                        disabled={sending || !inputText.trim()}
+                        className="btn-primary px-4"
+                    >
+                        <Send size={18} />
+                    </button>
                 </div>
             </div>
 
@@ -155,8 +262,8 @@ const ContextEditor = () => {
                     <button
                         onClick={() => setActiveCategory('all')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${activeCategory === 'all'
-                                ? 'bg-white/10 border-white/30 text-white'
-                                : 'border-border text-text-muted hover:border-white/20'
+                            ? 'bg-white/10 border-white/30 text-white'
+                            : 'border-border text-text-muted hover:border-white/20'
                             }`}
                     >
                         Все ({entries.length})
@@ -173,8 +280,8 @@ const ContextEditor = () => {
                                     color: activeCategory === cat ? cfg.color : undefined
                                 }}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${activeCategory === cat
-                                        ? 'bg-white/5'
-                                        : 'border-border text-text-muted hover:border-white/20'
+                                    ? 'bg-white/5'
+                                    : 'border-border text-text-muted hover:border-white/20'
                                     }`}
                             >
                                 {cfg.icon} {cfg.label} ({count})
