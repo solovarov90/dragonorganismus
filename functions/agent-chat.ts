@@ -30,7 +30,7 @@ export const handler: Handler = async (event, context) => {
             return { statusCode: 400, headers, body: JSON.stringify({ error: 'Message required' }) };
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         // Build conversation context
         const historyText = (history || [])
