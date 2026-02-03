@@ -456,18 +456,8 @@ const ContextEditor = () => {
                                 />
                             </div>
 
-                            <div>
-                                <label className="text-sm font-medium text-text-muted block mb-1">Ключевые слова (через запятую)</label>
-                                <input
-                                    className="input-field"
-                                    value={formData.keywords}
-                                    onChange={(e) => setFormData(p => ({ ...p, keywords: e.target.value }))}
-                                    placeholder="цена, продукт, курс"
-                                />
-                            </div>
-
                             <button onClick={handleSaveEntry} className="btn-primary w-full mt-4">
-                                {editingEntry ? 'Сохранить изменения' : 'Создать запись'}
+                                {editingEntry ? 'Сохранить изменения' : 'Сохранить факт'}
                             </button>
                         </div>
                     </div>
