@@ -6,9 +6,9 @@ const Layout = () => {
 
     const navItems = [
         { path: '/', label: 'Дашборд', icon: LayoutDashboard },
+        { path: '/context', label: 'Контекст', icon: Activity },
         { path: '/lead-magnets', label: 'Магниты', icon: FileText },
         { path: '/broadcasts', label: 'Рассылки', icon: Megaphone },
-        { path: '/context', label: 'Контекст', icon: Activity },
         { path: '/settings', label: 'Настройки', icon: Gear },
         { path: '/logs', label: 'Логи', icon: Activity },
     ];
@@ -38,13 +38,17 @@ const Layout = () => {
                         <Link
                             key={path}
                             to={path}
-                            className={`flex flex-col items-center p-2 text-xs transition-all duration-300 ${isActive
-                                ? 'text-primary scale-110 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                            className={`flex flex-col items-center justify-center p-2 text-xs transition-all duration-300 w-16 ${isActive
+                                ? 'text-primary transform -translate-y-2'
                                 : 'text-text-muted hover:text-text'
                                 }`}
                         >
-                            <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-                            <span className="mt-1 font-medium">{label}</span>
+                            <div className={`p-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-primary/20 shadow-neon border border-primary/30' : ''}`}>
+                                <Icon size={isActive ? 20 : 22} strokeWidth={isActive ? 2.5 : 2} />
+                            </div>
+                            <span className={`mt-1 font-medium text-[10px] whitespace-nowrap overflow-hidden text-ellipsis max-w-full transition-opacity duration-300 ${isActive ? 'opacity-100 font-bold' : 'opacity-70'}`}>
+                                {label}
+                            </span>
                         </Link>
                     );
                 })}
