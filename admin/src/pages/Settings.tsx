@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Sparkles, Image as ImageIcon, Eye, Clock } from 'lucide-react';
+import { Save, Sparkles, Image as ImageIcon, Clock } from 'lucide-react';
 import { api } from '../api';
 import ReactMarkdown from 'react-markdown';
 
