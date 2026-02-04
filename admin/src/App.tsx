@@ -6,6 +6,7 @@ import LeadMagnets from './pages/LeadMagnets';
 import ContextEditor from './pages/ContextEditor';
 import Logs from './pages/Logs';
 import Broadcasts from './pages/Broadcasts';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
             <Route path="context" element={<ContextEditor />} />
             <Route path="logs" element={<Logs />} />
             <Route path="broadcasts" element={<Broadcasts />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>
       </KnowledgeProvider>

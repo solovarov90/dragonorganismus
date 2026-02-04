@@ -9,6 +9,8 @@ export interface IUser extends Document {
     lastInteraction: Date;
     consumedMagnets: string[];
     learningMode?: boolean;
+    onboardingMode?: boolean;
+    bioSent?: boolean;
 }
 
 const UserSchema: Schema = new Schema({
@@ -20,6 +22,8 @@ const UserSchema: Schema = new Schema({
     lastInteraction: { type: Date, default: Date.now },
     consumedMagnets: [{ type: String }],
     learningMode: { type: Boolean, default: false },
+    onboardingMode: { type: Boolean, default: false },
+    bioSent: { type: Boolean, default: false },
 });
 
 export const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);

@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, Settings, Activity, Megaphone } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings as Gear, Activity, Megaphone } from 'lucide-react';
 
 const Layout = () => {
     const location = useLocation();
@@ -7,8 +7,9 @@ const Layout = () => {
     const navItems = [
         { path: '/', label: 'Дашборд', icon: LayoutDashboard },
         { path: '/lead-magnets', label: 'Магниты', icon: FileText },
-        { path: '/context', label: 'Контекст', icon: Settings },
         { path: '/broadcasts', label: 'Рассылки', icon: Megaphone },
+        { path: '/context', label: 'Контекст', icon: Activity },
+        { path: '/settings', label: 'Настройки', icon: Gear },
         { path: '/logs', label: 'Логи', icon: Activity },
     ];
 

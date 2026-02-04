@@ -69,21 +69,11 @@ bot.command("start", async (ctx) => {
 
     // Admin Menu Handling
     if (userId && ADMIN_IDS.includes(userId)) {
-        console.log(`Setting Admin Menu for user ${userId}`);
         try {
             await ctx.setChatMenuButton({
                 type: "web_app",
                 text: "Admin Panel",
                 web_app: { url: WEBAPP_URL }
-            });
-
-            // Fallback: Also send an inline button, as the Menu Button can be glitchy
-            await ctx.reply("👮‍♂️ Вы опознаны как администратор.", {
-                reply_markup: {
-                    inline_keyboard: [[
-                        { text: "🚀 Открыть Админку", web_app: { url: WEBAPP_URL } }
-                    ]]
-                }
             });
         } catch (err) {
             console.error("Failed to set admin menu:", err);
@@ -93,84 +83,53 @@ bot.command("start", async (ctx) => {
     if (payload) {
         const magnet = await LeadMagnet.findOne({ triggerId: payload });
         if (magnet && magnet.isActive) {
-            // Check if already consumed
-            const currentUser = await User.findOne({ telegramId: userId });
-            const isRevisit = currentUser?.consumedMagnets?.includes(payload);
-
-            if (!isRevisit) {
-                // Track consumption
-                await User.findOneAndUpdate(
-                    { telegramId: userId },
-                    { $addToSet: { consumedMagnets: magnet.triggerId } }
-                );
-
-                // Notify Admins & Log
-                const notificationMsg = `🧲 **Новый лид!**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})\n📦 Магнит: ${magnet.name}\n🆔 Trigger: ${payload}`;
-                await notifyAdmins(notificationMsg);
-                await logEvent('lead_magnet_consumed', userId!, `Consumed magnet: ${magnet.name}`, { magnetId: magnet._id, triggerId: payload });
-            } else {
-                await logMessage(userId!, 'assistant', `Re-visited magnet: ${magnet.name}`);
-            }
-
-            const welcomeMsg = magnet.welcomeMessage || `Вот ваш контент: ${magnet.name}\n\n${magnet.description}`;
-
-            // Deliver based on type
-            if (magnet.type === 'link' || (!magnet.type && magnet.link)) {
-                let link = magnet.content || magnet.link;
-                const btnText = magnet.buttonText || "Открыть 🚀";
-
-                // Basic URL fix
-                if (link && !link.startsWith('http')) {
-                    if (link.startsWith('@') || link.startsWith('t.me/')) {
-                        link = `https://t.me/${link.replace(/^@/, '').replace('t.me/', '')}`;
-                    } else {
-                        link = `https://${link}`;
-                    }
-                }
-
-                try {
-                    await ctx.reply(welcomeMsg, {
-                        parse_mode: "Markdown",
-                        reply_markup: {
-                            inline_keyboard: [[{ text: btnText, url: link }]]
-                        }
-                    });
-                } catch (e) {
-                    console.error(`Failed to send link magnet (url: ${link}):`, e);
-                    await ctx.reply(`${welcomeMsg}\n\nСсылка: ${link}`);
-                }
-            } else if (magnet.type === 'text') {
-                await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
-                await ctx.reply(magnet.content);
-            } else if (magnet.type === 'file') {
-                await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
-                // Content should be a file_id or url
-                try {
-                    await ctx.replyWithDocument(magnet.content, { caption: magnet.name });
-                } catch (e) {
-                    await ctx.reply(`Не удалось отправить файл. Вот ссылка: ${magnet.content}`);
-                }
-            }
-
-            await logMessage(userId!, 'assistant', `Sent Lead Magnet: ${magnet.name} (${magnet.type})`);
-
-            // Simple immediate follow-up simulation
-            if (magnet.followUpMessages && magnet.followUpMessages.length > 0) {
-                for (const msg of magnet.followUpMessages) {
-                    // In a real app, this would be scheduled. Here we just wait a bit or send immediately for demo.
-                    await ctx.reply(msg);
-                    await logMessage(userId!, 'assistant', `Follow-up: ${msg}`);
-                }
-            }
-
-            const menu = getMainMenu(ADMIN_IDS.includes(userId!));
-            await ctx.reply("Главное меню:", { reply_markup: menu });
+            // Use shared delivery logic
+            await deliverLeadMagnet(ctx, userId!, magnet, username);
             return;
         }
     }
 
-    // Standard Start Notification
-    await notifyAdmins(`🏃 **Новый старт бота**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})`);
+    // ONBOARDING FLOW (No payload)
+    const magnets = await LeadMagnet.find({ isActive: true });
+
+    // Only start onboarding if there are magnets to offer
+    if (magnets.length > 0) {
+        // Start proactive questioning
+        await User.findOneAndUpdate(
+            { telegramId: userId },
+            { $set: { onboardingMode: true } }
+        );
+
+        await ctx.reply("👋 Добро пожаловать!");
+
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const prompt = `Ты — профессиональный консультант. Твоя цель — помочь пользователю выбрать ОДИН лучший бесплатный материал (лид-магнит) из списка.
+        
+        Список доступных магнитов (ДЛЯ ТЕБЯ, не выводи его списком пользователю):
+        ${magnets.map(m => `- ID: ${m.triggerId}, Название: ${m.name}, Описание: ${m.description}`).join('\n')}
+        
+        Твоя задача: начни диалог с пользователем. 
+        1. Кратко представься (не говори, что ты ИИ, скажи что ты цифровой помощник эксперта).
+        2. Задай ОДИН короткий открытый вопрос, чтобы понять потребности пользователя и подобрать магнит.
+        
+        Пример: "Привет! Я цифровой помощник. У меня есть кое-что полезное. Расскажи, какая задача сейчас стоит перед тобой острее всего?"
+        `;
+
+        try {
+            const res = await model.generateContent(prompt);
+            const text = res.response.text();
+
+            await ctx.reply(text);
+            await logMessage(userId!, 'assistant', text);
+            return;
+        } catch (e) {
+            console.error("AI Error in Start:", e);
+            // Fallback
+        }
+    }
+
+    // Standard Start Notification (Fallback)
+    await notifyAdmins(`🏃 **Новый старт бота** (без онбординга)\n\n👤 Пользователь: [${username}](tg://user?id=${userId})`);
     await logEvent('bot_start', userId!, 'User started bot');
 
     const menu = getMainMenu(ADMIN_IDS.includes(userId!));
@@ -189,6 +148,81 @@ const getMainMenu = (isAdmin: boolean) => {
     }
 
     return keyboard.resized();
+};
+
+const deliverLeadMagnet = async (ctx: any, userId: string, magnet: any, username: string) => {
+    // Check if already consumed
+    const currentUser = await User.findOne({ telegramId: userId });
+    const isRevisit = currentUser?.consumedMagnets?.includes(magnet.triggerId);
+
+    if (!isRevisit) {
+        // Track consumption
+        await User.findOneAndUpdate(
+            { telegramId: userId },
+            { $addToSet: { consumedMagnets: magnet.triggerId } }
+        );
+
+        // Notify Admins & Log
+        const notificationMsg = `🧲 **Новый лид!**\n\n👤 Пользователь: [${username}](tg://user?id=${userId})\n📦 Магнит: ${magnet.name}\n🆔 Trigger: ${magnet.triggerId}`;
+        await notifyAdmins(notificationMsg);
+        await logEvent('lead_magnet_consumed', userId!, `Consumed magnet: ${magnet.name}`, { magnetId: magnet._id, triggerId: magnet.triggerId });
+    } else {
+        await logMessage(userId!, 'assistant', `Re-visited magnet: ${magnet.name}`);
+    }
+
+    // Send Welcome Message
+    const welcomeMsg = magnet.welcomeMessage || `Вот ваш контент: ${magnet.name}\n\n${magnet.description}`;
+
+    if (magnet.type === 'link' || (!magnet.type && magnet.link)) {
+        let link = magnet.content || magnet.link;
+        const btnText = magnet.buttonText || "Открыть 🚀";
+
+        // Basic URL fix
+        if (link && !link.startsWith('http')) {
+            if (link.startsWith('@') || link.startsWith('t.me/')) {
+                link = `https://t.me/${link.replace(/^@/, '').replace('t.me/', '')}`;
+            } else {
+                link = `https://${link}`;
+            }
+        }
+
+        try {
+            await ctx.reply(welcomeMsg, {
+                parse_mode: "Markdown",
+                reply_markup: {
+                    inline_keyboard: [[{ text: btnText, url: link }]]
+                }
+            });
+        } catch (e) {
+            console.error(`Failed to send link magnet (url: ${link}):`, e);
+            await ctx.reply(`${welcomeMsg}\n\nСсылка: ${link}`);
+        }
+    } else if (magnet.type === 'text') {
+        await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
+        await ctx.reply(magnet.content);
+    } else if (magnet.type === 'file') {
+        await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
+        try {
+            await ctx.replyWithDocument(magnet.content, { caption: magnet.name });
+        } catch (e) {
+            await ctx.reply(`Не удалось отправить файл. Вот ссылка: ${magnet.content}`);
+        }
+    }
+
+    await logMessage(userId!, 'assistant', `Sent Lead Magnet: ${magnet.name} (${magnet.type})`);
+
+    // Only send follow-ups and menu if NOT revisited to avoid spamming on clicks
+    if (!isRevisit) {
+        if (magnet.followUpMessages && magnet.followUpMessages.length > 0) {
+            for (const msg of magnet.followUpMessages) {
+                await ctx.reply(msg);
+                await logMessage(userId!, 'assistant', `Follow-up: ${msg}`);
+            }
+        }
+    }
+
+    const menu = getMainMenu(ADMIN_IDS.includes(userId!));
+    await ctx.reply("Главное меню:", { reply_markup: menu });
 };
 
 bot.on("message:text", async (ctx) => {
@@ -230,6 +264,76 @@ bot.on("message:text", async (ctx) => {
     }
 
     try {
+        // ONBOARDING HANDLER
+        const userForOnboarding = await User.findOne({ telegramId: userId });
+        if (userForOnboarding?.onboardingMode) {
+            const magnets = await LeadMagnet.find({ isActive: true });
+            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+            // Construct history
+            const history = await MessageLog.find({ userId }).sort({ timestamp: -1 }).limit(10);
+            const historyText = history.reverse().map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
+
+            const prompt = `Ты — консультант, который общается с пользователем, чтобы подобрать идеальный бесплатный материал (лид-магнит).
+             
+             ВАЖНОЕ ПРАВИЛО: НИКОГДА не вываливай список всех магнитов, если тебя об этом ПРЯМО не попросили. Твоя задача — задать уточняющий вопрос, чтобы сузить поиск, и предложить ТОЛЬКО ОДИН, самый подходящий вариант с объяснением.
+             
+             Доступные магниты (эта информация ДЛЯ ТЕБЯ):
+             ${magnets.map(m => `- ID: ${m.triggerId}, Название: ${m.name}, Описание: ${m.description}`).join('\n')}
+             
+             История диалога:
+             ${historyText}
+             
+             User: ${userText}
+             
+             Твоя задача:
+             Проанализируй ответ пользователя.
+             ЕСЛИ ты уверен, какой магнит подойдет лучше всего:
+             1. ВЕРНИ JSON объект: {"recommendation": "ID_МАГНИТА", "reason": "Текст объяснения, почему ты рекомендуешь именно этот вариант."}
+
+             ЕСЛИ пользователь ПРЯМО попросил показать ВСЕ варианты:
+             1. Просто выведи список с кратким описанием своими словами (НЕ JSON).
+             
+             ЕСЛИ пока не понятно (потребность не ясна или нужно уточнение):
+             1. Задай один короткий вопрос, чтобы выявить потребность. (НЕ JSON).
+             
+             В ответе НЕ должно быть markdown блоков кода (backticks), если это JSON.
+             `;
+
+            const result = await model.generateContent(prompt);
+            const responseText = result.response.text();
+
+            // Try parse JSON
+            try {
+                const jsonStr = responseText.match(/\{[\s\S]*\}/)?.[0];
+                if (jsonStr) {
+                    const data = JSON.parse(jsonStr);
+                    if (data.recommendation) {
+                        const magnet = magnets.find(m => m.triggerId === data.recommendation);
+                        if (magnet) {
+                            // Send generated reason
+                            if (data.reason) await ctx.reply(data.reason);
+                            await logMessage(userId, 'assistant', data.reason || "Sending magnet");
+
+                            // Deliver magnet
+                            await deliverLeadMagnet(ctx, userId, magnet, ctx.from.username || "User");
+
+                            // Finish onboarding
+                            await User.findOneAndUpdate({ telegramId: userId }, { $set: { onboardingMode: false } });
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to parse onboarding JSON:", e);
+            }
+
+            // If not JSON or failed (asking question)
+            await ctx.reply(responseText);
+            await logMessage(userId, 'assistant', responseText);
+            return;
+        }
+
         // Check for /learn command (admin only)
         if (userText.startsWith('/learn') && isAdmin) {
             await ctx.reply(
