@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, Plus, Trash, Edit, X, Brain, Check, XCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useKnowledge } from '../context/KnowledgeContext';
 import { api } from '../api';
 import type { KnowledgeEntry, KnowledgeCategory } from '../types';
 import { CATEGORY_CONFIG } from '../types';
@@ -53,9 +54,8 @@ const ContextEditor = () => {
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Knowledge Base State
-    const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
-    const [loadingEntries, setLoadingEntries] = useState(true);
+    // Knowledge Base State (from Context)
+    const { entries, loading: loadingEntries, addEntry, updateEntry, deleteEntry } = useKnowledge();
     const [activeCategory, setActiveCategory] = useState<KnowledgeCategory | 'all'>('all');
 
     // Modal State
@@ -65,12 +65,9 @@ const ContextEditor = () => {
         category: 'author' as KnowledgeCategory,
         title: '',
         content: '',
-        keywords: ''
     });
 
-    useEffect(() => {
-        fetchEntries();
-    }, []);
+
 
     // Smart scroll - only scroll within chat container
     useEffect(() => {
@@ -86,16 +83,7 @@ const ContextEditor = () => {
         }
     }, [sending, isTypingComplete]);
 
-    const fetchEntries = async () => {
-        try {
-            const res = await api.get('/knowledge');
-            setEntries(res.data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoadingEntries(false);
-        }
-    };
+
 
     const handleSendMessage = async () => {
         if (!inputText.trim() || sending) return;
@@ -137,14 +125,12 @@ const ContextEditor = () => {
 
     const handleApproveFact = async (fact: PendingFact, index: number) => {
         try {
-            await api.post('/knowledge', {
+            await addEntry({
                 category: fact.category,
                 title: fact.title,
-                content: fact.content,
-                keywords: []
+                content: fact.content
             });
             setPendingFacts(prev => prev.filter((_, i) => i !== index));
-            fetchEntries();
         } catch (err) {
             console.error(err);
         }
@@ -160,30 +146,27 @@ const ContextEditor = () => {
             setFormData({
                 category: entry.category,
                 title: entry.title,
-                content: entry.content,
-                keywords: entry.keywords?.join(', ') || ''
+                content: entry.content
             });
         } else {
             setEditingEntry(null);
-            setFormData({ category: 'author', title: '', content: '', keywords: '' });
+            setFormData({ category: 'author', title: '', content: '' });
         }
         setShowModal(true);
     };
 
     const handleSaveEntry = async () => {
         const payload = {
-            ...formData,
-            keywords: formData.keywords.split(',').map(k => k.trim()).filter(Boolean)
+            ...formData
         };
 
         try {
             if (editingEntry) {
-                await api.put(`/knowledge?id=${editingEntry._id}`, payload);
+                await updateEntry(editingEntry._id, payload);
             } else {
-                await api.post('/knowledge', payload);
+                await addEntry(payload);
             }
             setShowModal(false);
-            fetchEntries();
         } catch (err: any) {
             alert(`Ошибка: ${err.response?.data?.error || err.message}`);
         }
@@ -192,8 +175,7 @@ const ContextEditor = () => {
     const handleDelete = async (id: string) => {
         if (!confirm('Удалить эту запись?')) return;
         try {
-            await api.delete(`/knowledge?id=${id}`);
-            fetchEntries();
+            await deleteEntry(id);
         } catch (err) {
             console.error(err);
         }
@@ -370,28 +352,29 @@ const ContextEditor = () => {
                                     className="glass-panel p-4 hover:border-white/30 transition-colors group relative"
                                     style={{ borderLeftColor: cfg.color, borderLeftWidth: 4 }}
                                 >
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                        <button onClick={() => openModal(entry)} className="p-1 hover:text-primary"><Edit size={14} /></button>
-                                        <button onClick={() => handleDelete(entry._id)} className="p-1 hover:text-red-500"><Trash size={14} /></button>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xl p-2 bg-surface rounded-lg">{cfg.icon}</span>
+                                            <div>
+                                                <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: cfg.color }}>
+                                                    {cfg.label}
+                                                </span>
+                                                <h3 className="font-bold text-text text-sm line-clamp-1">{entry.title}</h3>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1 ml-2">
+                                            <button onClick={() => openModal(entry)} className="p-1.5 text-text-muted hover:text-primary hover:bg-primary/10 rounded transition-colors">
+                                                <Edit size={16} />
+                                            </button>
+                                            <button onClick={() => handleDelete(entry._id)} className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded transition-colors">
+                                                <Trash size={16} />
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-lg">{cfg.icon}</span>
-                                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: cfg.color }}>
-                                            {cfg.label}
-                                        </span>
+                                    <div className="pl-[52px]">
+                                        <p className="text-xs text-text-muted line-clamp-3 leading-relaxed">{entry.content}</p>
                                     </div>
-                                    <h3 className="font-bold text-text truncate">{entry.title}</h3>
-                                    <p className="text-xs text-text-muted mt-1 line-clamp-3">{entry.content}</p>
-                                    {entry.keywords?.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-2">
-                                            {entry.keywords.slice(0, 3).map(kw => (
-                                                <span key={kw} className="text-[10px] bg-surface px-1.5 py-0.5 rounded text-text-muted">
-                                                    {kw}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })}

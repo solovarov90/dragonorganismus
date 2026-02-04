@@ -41,7 +41,6 @@ export interface KnowledgeEntry {
     category: KnowledgeCategory;
     title: string;
     content: string;
-    keywords: string[];
     createdAt: string;
     updatedAt: string;
 }
