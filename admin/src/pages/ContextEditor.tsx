@@ -140,6 +140,31 @@ const ContextEditor = () => {
         setPendingFacts(prev => prev.filter((_, i) => i !== index));
     };
 
+    // Load draft on mount/when opening modal for new entry
+    useEffect(() => {
+        if (!showModal || editingEntry) return;
+
+        const draft = localStorage.getItem('context_editor_draft');
+        if (draft) {
+            try {
+                const parsed = JSON.parse(draft);
+                setFormData(parsed);
+            } catch (e) {
+                console.error("Failed to parse draft", e);
+            }
+        }
+    }, [showModal, editingEntry]);
+
+    // Save draft when form data changes (debounced slightly by nature of React state, but explicit debounce is better if high frequency)
+    // For simplicity, saving on every change is fine for small text
+    useEffect(() => {
+        if (!showModal || editingEntry) return;
+
+        if (formData.title || formData.content) {
+            localStorage.setItem('context_editor_draft', JSON.stringify(formData));
+        }
+    }, [formData, showModal, editingEntry]);
+
     const openModal = (entry?: KnowledgeEntry) => {
         if (entry) {
             setEditingEntry(entry);
@@ -150,7 +175,18 @@ const ContextEditor = () => {
             });
         } else {
             setEditingEntry(null);
-            setFormData({ category: 'author', title: '', content: '' });
+            // Try to load draft immediately or fall back to default
+            const draft = localStorage.getItem('context_editor_draft');
+            if (draft) {
+                try {
+                    const parsed = JSON.parse(draft);
+                    setFormData(parsed);
+                } catch {
+                    setFormData({ category: 'author', title: '', content: '' });
+                }
+            } else {
+                setFormData({ category: 'author', title: '', content: '' });
+            }
         }
         setShowModal(true);
     };
@@ -165,8 +201,12 @@ const ContextEditor = () => {
                 await updateEntry(editingEntry._id, payload);
             } else {
                 await addEntry(payload);
+                // Clear draft on successful save
+                localStorage.removeItem('context_editor_draft');
             }
             setShowModal(false);
+            // Reset form
+            setFormData({ category: 'author', title: '', content: '' });
         } catch (err: any) {
             alert(`Ошибка: ${err.response?.data?.error || err.message}`);
         }
@@ -384,64 +424,78 @@ const ContextEditor = () => {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="glass-panel w-full max-w-lg p-6 border border-border">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-lg text-text">
-                                {editingEntry ? 'Редактировать запись' : 'Новая запись'}
-                            </h3>
-                            <button onClick={() => setShowModal(false)} className="text-text-muted hover:text-white">
-                                <X size={20} />
-                            </button>
-                        </div>
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto" onClick={(e) => {
+                    if (e.target === e.currentTarget) setShowModal(false);
+                }}>
+                    <div className="min-h-full flex items-center justify-center p-4">
+                        <div className="glass-panel w-full max-w-lg p-6 border border-border relative my-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="font-bold text-lg text-text">
+                                    {editingEntry ? 'Редактировать запись' : 'Новая запись'}
+                                </h3>
+                                <button onClick={() => setShowModal(false)} className="text-text-muted hover:text-white">
+                                    <X size={20} />
+                                </button>
+                            </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium text-text-muted block mb-1">Категория</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {categories.map(cat => {
-                                        const cfg = CATEGORY_CONFIG[cat];
-                                        return (
-                                            <button
-                                                key={cat}
-                                                type="button"
-                                                onClick={() => setFormData(p => ({ ...p, category: cat }))}
-                                                style={{
-                                                    borderColor: formData.category === cat ? cfg.color : undefined,
-                                                    backgroundColor: formData.category === cat ? `${cfg.color}20` : undefined
-                                                }}
-                                                className="px-3 py-1.5 rounded-lg text-xs font-bold border border-border transition-all"
-                                            >
-                                                {cfg.icon} {cfg.label}
-                                            </button>
-                                        );
-                                    })}
+                            <div className="space-y-6 pb-32"> {/* Added extra padding for mobile keyboard */}
+                                <div>
+                                    <label className="text-sm font-medium text-text-muted block mb-2">Категория</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {categories.map(cat => {
+                                            const cfg = CATEGORY_CONFIG[cat];
+                                            return (
+                                                <button
+                                                    key={cat}
+                                                    type="button"
+                                                    onClick={() => setFormData(p => ({ ...p, category: cat }))}
+                                                    style={{
+                                                        borderColor: formData.category === cat ? cfg.color : undefined,
+                                                        backgroundColor: formData.category === cat ? `${cfg.color}20` : undefined
+                                                    }}
+                                                    className="px-3 py-1.5 rounded-lg text-xs font-bold border border-border transition-all"
+                                                >
+                                                    {cfg.icon} {cfg.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div>
-                                <label className="text-sm font-medium text-text-muted block mb-1">Заголовок</label>
-                                <input
-                                    className="input-field"
-                                    value={formData.title}
-                                    onChange={(e) => setFormData(p => ({ ...p, title: e.target.value }))}
-                                    placeholder="Краткое название факта"
-                                />
-                            </div>
+                                <div>
+                                    <label className="text-sm font-medium text-text-muted block mb-2">Заголовок</label>
+                                    <input
+                                        className="input-field w-full"
+                                        value={formData.title}
+                                        onChange={(e) => setFormData(p => ({ ...p, title: e.target.value }))}
+                                        placeholder="Краткое название факта"
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="text-sm font-medium text-text-muted block mb-1">Содержание</label>
-                                <textarea
-                                    className="input-field min-h-[120px]"
-                                    value={formData.content}
-                                    onChange={(e) => setFormData(p => ({ ...p, content: e.target.value }))}
-                                    placeholder="Полное описание факта..."
-                                />
-                            </div>
+                                <div>
+                                    <label className="text-sm font-medium text-text-muted block mb-2">Содержание</label>
+                                    <textarea
+                                        ref={(el) => {
+                                            if (el) {
+                                                el.style.height = 'auto';
+                                                el.style.height = el.scrollHeight + 'px';
+                                            }
+                                        }}
+                                        className="input-field min-h-[120px] w-full resize-none overflow-hidden"
+                                        value={formData.content}
+                                        onChange={(e) => {
+                                            setFormData(p => ({ ...p, content: e.target.value }));
+                                            e.target.style.height = 'auto';
+                                            e.target.style.height = e.target.scrollHeight + 'px';
+                                        }}
+                                        placeholder="Полное описание факта..."
+                                    />
+                                </div>
 
-                            <button onClick={handleSaveEntry} className="btn-primary w-full mt-4">
-                                {editingEntry ? 'Сохранить изменения' : 'Сохранить факт'}
-                            </button>
+                                <button onClick={handleSaveEntry} className="btn-primary w-full mt-4 py-3">
+                                    {editingEntry ? 'Сохранить изменения' : 'Сохранить факт'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
